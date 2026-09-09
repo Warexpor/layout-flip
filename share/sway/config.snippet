@@ -1,0 +1,4 @@
+# Sway: select text, then Ctrl+Shift+x.
+# Prefer releasing modifiers before the script injects Ctrl+C; if misses occur,
+# wrap with `sleep 0.1 && layout-flip --selection`.
+bindsym --release Ctrl+Shift+x exec layout-flip --selection

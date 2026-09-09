@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+# layout-flip — convert mistyped text between EN (QWERTY) and RU (ЙЦУКЕН)
+# by physical key position.
+#
+#   layout-flip "z t,fk rf,fyf? ,kz"   # → я ебал кабана, бля
+#   echo "Ghbdtn" | layout-flip         # → Привет
+#   layout-flip --clip                  # flip clipboard
+#   layout-flip --selection             # flip current selection (hotkey helper)
+#
+# Selection mode needs a Wayland/X11 key injector + clipboard tool.
+# Preferred stack: Hyprland (hyprctl send_key_state) + wl-clipboard.
+# Fallbacks: wtype, xdotool, xclip, xsel.
+
+set -euo pipefail
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+flip_text() {
+  LAYOUT_FLIP_TEXT="$(cat)" python3 - <<'PY'
+import os
+import sys
+
+EN = "`qwertyuiop[]asdfghjkl;'zxcvbnm,./~QWERTYUIOP{}ASDFGHJKL:\"ZXCVBNM<>?"
+RU = "ёйцукенгшщзхъфывапролджэячсмитьбю.ЁЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,"
+assert len(EN) == len(RU), (len(EN), len(RU))
+
+en2ru = str.maketrans(EN, RU)
+ru2en = str.maketrans(RU, EN)
+en_set, ru_set = set(EN), set(RU)
+
+
+def flip(text: str) -> str:
+    en = ru = 0
+    for ch in text:
+        in_en, in_ru = ch in en_set, ch in ru_set
+        if in_en and not in_ru:
+            en += 1
+        elif in_ru and not in_en:
+            ru += 1
+    if ru > en:
+        return text.translate(ru2en)
+    if en > ru:
+        return text.translate(en2ru)
+    if ru:
+        return text.translate(ru2en)
+    return text.translate(en2ru)
+
+
+sys.stdout.write(flip(os.environ.get("LAYOUT_FLIP_TEXT", "")))
+PY
+}
+
+is_wayland() {
+  [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]
+}
+
+read_clip() {
+  if is_wayland && have wl-paste; then
+    wl-paste --no-newline --type text 2>/dev/null || true
+  elif have xclip; then
+    xclip -selection clipboard -o 2>/dev/null || true
+  elif have xsel; then
+    xsel --clipboard --output 2>/dev/null || true
+  else
+    echo "layout-flip: need wl-paste, xclip, or xsel" >&2
+    exit 1
+  fi
+}
+
+write_clip() {
+  if is_wayland && have wl-copy; then
+    printf '%s' "$1" | wl-copy --type text/plain
+  elif have xclip; then
+    printf '%s' "$1" | xclip -selection clipboard
+  elif have xsel; then
+    printf '%s' "$1" | xsel --clipboard --input
+  else
+    echo "layout-flip: need wl-copy, xclip, or xsel" >&2
+    exit 1
+  fi
+}
+
+# Map friendly mod names to wtype/xdotool forms.
+send_chord() {
+  local mods="$1" key="$2"
+
+  # Hyprland: inject via compositor seat (best with fcitx5 / held modifiers).
+  if have hyprctl && hyprctl version >/dev/null 2>&1; then
+    hyprctl dispatch "hl.dsp.send_key_state({ mods = '${mods}', key = '${key}', state = 'down' })" >/dev/null 2>&1 || true
+    sleep 0.01
+    hyprctl dispatch "hl.dsp.send_key_state({ mods = '${mods}', key = '${key}', state = 'up' })" >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  local lower_mods="" m
+  for m in $mods; do
+    case "${m^^}" in
+      CTRL|CONTROL) lower_mods+="ctrl " ;;
+      SHIFT) lower_mods+="shift " ;;
+      ALT) lower_mods+="alt " ;;
+      SUPER|LOGO|WIN) lower_mods+="logo " ;;
+      *) lower_mods+="${m,,} " ;;
+    esac
+  done
+
+  if is_wayland && have wtype; then
+    for m in $lower_mods; do wtype -M "$m"; done
+    wtype -k "${key,,}"
+    for m in $lower_mods; do wtype -m "$m"; done
+    return 0
+  fi
+
+  if have xdotool; then
+    local chord=""
+    for m in $lower_mods; do
+      case "$m" in
+        ctrl) chord+="ctrl+" ;;
+        shift) chord+="shift+" ;;
+        alt) chord+="alt+" ;;
+        logo) chord+="super+" ;;
+      esac
+    done
+    chord+="${key,,}"
+    xdotool key --clearmodifiers "$chord"
+    return 0
+  fi
+
+  echo "layout-flip: need hyprctl (Hyprland), wtype, or xdotool for --selection" >&2
+  exit 1
+}
+
+active_is_terminal() {
+  if have hyprctl; then
+    local tags
+    tags="$(hyprctl activewindow -j 2>/dev/null | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("tags") or []))' 2>/dev/null || true)"
+    [[ "$tags" == *terminal* ]] && return 0
+  fi
+  return 1
+}
+
+flip_selection() {
+  local copy_mods="CTRL" copy_key="C" paste_mods="CTRL" paste_key="V"
+  if active_is_terminal; then
+    copy_key="Insert"
+    paste_mods="SHIFT"
+    paste_key="Insert"
+  fi
+
+  local old src out
+  old="$(read_clip)"
+  send_chord "$copy_mods" "$copy_key"
+  sleep 0.03
+  src="$(read_clip)"
+  [[ -z "$src" ]] && exit 0
+
+  out="$(printf '%s' "$src" | flip_text)"
+  write_clip "$out"
+  send_chord "$paste_mods" "$paste_key"
+  ( sleep 0.4; write_clip "$old"; ) >/dev/null 2>&1 &
+}
+
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  layout-flip TEXT             Print EN↔RU key-position flip of TEXT
+  layout-flip --clip           Flip current clipboard contents
+  layout-flip --selection      Flip currently highlighted text (hotkey target)
+  echo TEXT | layout-flip      Flip stdin
+
+Typical hotkey flow: select text (Ctrl+A), then run --selection.
+EOF
+}
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  --selection) flip_selection; exit 0 ;;
+  --clip)
+    src="$(read_clip)"
+    [[ -z "$src" ]] && exit 0
+    write_clip "$(printf '%s' "$src" | flip_text)"
+    exit 0
+    ;;
+esac
+
+if [[ $# -gt 0 ]]; then
+  printf '%s' "$*" | flip_text
+  exit 0
+fi
+
+if [[ ! -t 0 ]]; then
+  flip_text
+  exit 0
+fi
+
+usage
+exit 2

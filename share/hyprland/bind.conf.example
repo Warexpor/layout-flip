@@ -1,0 +1,2 @@
+# Classic Hyprland .conf (non-Lua). Physical X = keycode 53.
+bind = CTRL SHIFT, code:53, exec, layout-flip --selection
