@@ -1,2 +1,3 @@
-# Classic Hyprland .conf (non-Lua). Physical X = keycode 53.
+# Classic Hyprland .conf — uses wtype/xdotool path inside --selection.
+# On Omarchy/Lua Hyprland, prefer share/hyprland/bindings.example.lua instead.
 bind = CTRL SHIFT, code:53, exec, layout-flip --selection

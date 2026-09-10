@@ -16,38 +16,13 @@ set -euo pipefail
 have() { command -v "$1" >/dev/null 2>&1; }
 
 flip_text() {
-  LAYOUT_FLIP_TEXT="$(cat)" python3 - <<'PY'
-import os
-import sys
-
-EN = "`qwertyuiop[]asdfghjkl;'zxcvbnm,./~QWERTYUIOP{}ASDFGHJKL:\"ZXCVBNM<>?"
-RU = "ёйцукенгшщзхъфывапролджэячсмитьбю.ЁЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,"
-assert len(EN) == len(RU), (len(EN), len(RU))
-
-en2ru = str.maketrans(EN, RU)
-ru2en = str.maketrans(RU, EN)
-en_set, ru_set = set(EN), set(RU)
-
-
-def flip(text: str) -> str:
-    en = ru = 0
-    for ch in text:
-        in_en, in_ru = ch in en_set, ch in ru_set
-        if in_en and not in_ru:
-            en += 1
-        elif in_ru and not in_en:
-            ru += 1
-    if ru > en:
-        return text.translate(ru2en)
-    if en > ru:
-        return text.translate(en2ru)
-    if ru:
-        return text.translate(ru2en)
-    return text.translate(en2ru)
-
-
-sys.stdout.write(flip(os.environ.get("LAYOUT_FLIP_TEXT", "")))
-PY
+  local self core
+  self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+  core="$(dirname "$self")/layout_flip_core.py"
+  if [[ ! -f "$core" ]]; then
+    core="$HOME/.local/lib/layout-flip/layout_flip_core.py"
+  fi
+  python3 "$core"
 }
 
 is_wayland() {
@@ -81,16 +56,10 @@ write_clip() {
 }
 
 # Map friendly mod names to wtype/xdotool forms.
+# Note: on Hyprland, prefer binding --clip from Lua with hl.dsp.send_key_state
+# (see share/hyprland/bindings.example.lua). Bash hyprctl send_key_state is flaky.
 send_chord() {
   local mods="$1" key="$2"
-
-  # Hyprland: inject via compositor seat (best with fcitx5 / held modifiers).
-  if have hyprctl && hyprctl version >/dev/null 2>&1; then
-    hyprctl dispatch "hl.dsp.send_key_state({ mods = '${mods}', key = '${key}', state = 'down' })" >/dev/null 2>&1 || true
-    sleep 0.01
-    hyprctl dispatch "hl.dsp.send_key_state({ mods = '${mods}', key = '${key}', state = 'up' })" >/dev/null 2>&1 || true
-    return 0
-  fi
 
   local lower_mods="" m
   for m in $mods; do
@@ -125,7 +94,7 @@ send_chord() {
     return 0
   fi
 
-  echo "layout-flip: need hyprctl (Hyprland), wtype, or xdotool for --selection" >&2
+  echo "layout-flip: need wtype (Wayland) or xdotool (X11) for --selection" >&2
   exit 1
 }
 

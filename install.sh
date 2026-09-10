@@ -8,6 +8,9 @@ BIN_DIR="$PREFIX/bin"
 mkdir -p "$BIN_DIR"
 
 install -m 0755 "$ROOT/bin/layout-flip" "$BIN_DIR/layout-flip"
+install -d "$PREFIX/lib/layout-flip"
+install -m 0644 "$ROOT/bin/layout_flip_core.py" "$PREFIX/lib/layout-flip/layout_flip_core.py"
+install -m 0644 "$ROOT/bin/layout_flip_core.py" "$BIN_DIR/layout_flip_core.py"
 
 echo "Installed: $BIN_DIR/layout-flip"
 

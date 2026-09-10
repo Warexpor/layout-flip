@@ -40,15 +40,11 @@ layout-flip --selection       # flip current highlight (for a hotkey)
 
 ## Hyprland
 
-**Omarchy / Lua** — add to `~/.config/hypr/bindings.lua` (see `share/hyprland/bindings.example.lua`):
+> **Hyprland:** never call `os.execute` / block on clipboard from a bind handler — that freezes the compositor. Use the Lua example (`hl.exec_cmd` + timers) or bind `layout-flip --selection` for other WMs.
 
-```lua
-o.bind(
-  "CTRL + SHIFT + code:53",
-  "Flip EN/RU layout typing",
-  "layout-flip --selection"
-)
-```
+**Omarchy / Lua** — copy `share/hyprland/bindings.example.lua` into `~/.config/hypr/bindings.lua`.
+
+That snippet injects Ctrl+C / Ctrl+V via Hyprland Lua (`send_key_state`), then runs `layout-flip --clip`. Do not bind bare `layout-flip --selection` on Hyprland — bash `hyprctl send_key_state` is unreliable.
 
 `code:53` is the physical `X` key, so the bind still works when the RU layout is active (keysym would be `Ч`).
 
