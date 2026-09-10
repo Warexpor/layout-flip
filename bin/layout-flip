@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # layout-flip — convert mistyped text between EN (QWERTY) and RU (ЙЦУКЕН)
-# by physical key position.
+# by physical key position (CLI / clipboard only).
+#
+# For in-app hotkeys on Hyprland, use retypex instead (evdev+uinput daemon):
+#   retypex word   — fix the last typed word
+#   retypex sel    — fix the current selection
 #
 #   layout-flip "z t,fk rf,fyf? ,kz"   # → я ебал кабана, бля
 #   echo "Ghbdtn" | layout-flip         # → Привет
-#   layout-flip --clip                  # flip clipboard
-#   layout-flip --selection             # flip current selection (hotkey helper)
-#
-# Selection mode needs a Wayland/X11 key injector + clipboard tool.
-# Preferred stack: Hyprland (hyprctl send_key_state) + wl-clipboard.
-# Fallbacks: wtype, xdotool, xclip, xsel.
+#   layout-flip --clip                  # flip clipboard only
 
 set -euo pipefail
 
@@ -55,99 +54,30 @@ write_clip() {
   fi
 }
 
-# Map friendly mod names to wtype/xdotool forms.
-# Note: on Hyprland, prefer binding --clip from Lua with hl.dsp.send_key_state
-# (see share/hyprland/bindings.example.lua). Bash hyprctl send_key_state is flaky.
-send_chord() {
-  local mods="$1" key="$2"
-
-  local lower_mods="" m
-  for m in $mods; do
-    case "${m^^}" in
-      CTRL|CONTROL) lower_mods+="ctrl " ;;
-      SHIFT) lower_mods+="shift " ;;
-      ALT) lower_mods+="alt " ;;
-      SUPER|LOGO|WIN) lower_mods+="logo " ;;
-      *) lower_mods+="${m,,} " ;;
-    esac
-  done
-
-  if is_wayland && have wtype; then
-    for m in $lower_mods; do wtype -M "$m"; done
-    wtype -k "${key,,}"
-    for m in $lower_mods; do wtype -m "$m"; done
-    return 0
-  fi
-
-  if have xdotool; then
-    local chord=""
-    for m in $lower_mods; do
-      case "$m" in
-        ctrl) chord+="ctrl+" ;;
-        shift) chord+="shift+" ;;
-        alt) chord+="alt+" ;;
-        logo) chord+="super+" ;;
-      esac
-    done
-    chord+="${key,,}"
-    xdotool key --clearmodifiers "$chord"
-    return 0
-  fi
-
-  echo "layout-flip: need wtype (Wayland) or xdotool (X11) for --selection" >&2
-  exit 1
-}
-
-active_is_terminal() {
-  if have hyprctl; then
-    local tags
-    tags="$(hyprctl activewindow -j 2>/dev/null | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("tags") or []))' 2>/dev/null || true)"
-    [[ "$tags" == *terminal* ]] && return 0
-  fi
-  return 1
-}
-
-flip_selection() {
-  local copy_mods="CTRL" copy_key="C" paste_mods="CTRL" paste_key="V"
-  if active_is_terminal; then
-    copy_key="Insert"
-    paste_mods="SHIFT"
-    paste_key="Insert"
-  fi
-
-  local old src out
-  old="$(read_clip)"
-  send_chord "$copy_mods" "$copy_key"
-  sleep 0.03
-  src="$(read_clip)"
-  [[ -z "$src" ]] && exit 0
-
-  out="$(printf '%s' "$src" | flip_text)"
-  write_clip "$out"
-  send_chord "$paste_mods" "$paste_key"
-  ( sleep 0.4; write_clip "$old"; ) >/dev/null 2>&1 &
-}
-
 usage() {
   cat >&2 <<'EOF'
 Usage:
   layout-flip TEXT             Print EN↔RU key-position flip of TEXT
   layout-flip --clip           Flip current clipboard contents
-  layout-flip --selection      Flip currently highlighted text (hotkey target)
   echo TEXT | layout-flip      Flip stdin
 
-Typical hotkey flow: select text (Ctrl+A), then run --selection.
+Hotkeys (Hyprland): use retypex, not this script.
+  retypex word                 Fix last typed word (evdev/uinput)
+  retypex sel                  Fix highlighted selection
 EOF
 }
 
 case "${1:-}" in
   -h|--help) usage; exit 0 ;;
-  --selection) flip_selection; exit 0 ;;
   --clip)
     src="$(read_clip)"
     [[ -z "$src" ]] && exit 0
     write_clip "$(printf '%s' "$src" | flip_text)"
     exit 0
+    ;;
+  --replace|--selection|--hotkey|--grab|--after-copy|--clip-ready|--clip-arm)
+    echo "layout-flip: hotkey path removed — install/use retypex (retypex word / retypex sel)" >&2
+    exit 2
     ;;
 esac
 

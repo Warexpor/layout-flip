@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install layout-flip into ~/.local/bin (override with PREFIX).
+# Install layout-flip CLI into ~/.local/bin (override with PREFIX).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -12,7 +12,7 @@ install -d "$PREFIX/lib/layout-flip"
 install -m 0644 "$ROOT/bin/layout_flip_core.py" "$PREFIX/lib/layout-flip/layout_flip_core.py"
 install -m 0644 "$ROOT/bin/layout_flip_core.py" "$BIN_DIR/layout_flip_core.py"
 
-echo "Installed: $BIN_DIR/layout-flip"
+echo "Installed: $BIN_DIR/layout-flip (CLI / --clip only)"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
@@ -23,12 +23,8 @@ case ":$PATH:" in
 esac
 
 echo
-echo "Hyprland (Omarchy Lua) — add to ~/.config/hypr/bindings.lua:"
+echo "For Hyprland hotkeys, use retypex (not this script):"
+echo "  yay -S retypex-git && systemctl --user enable --now retypexd"
 echo
-cat "$ROOT/share/hyprland/bindings.example.lua"
-echo
-echo "Classic Hyprland bind — see share/hyprland/bind.conf.example"
-echo "Sway — see share/sway/config.snippet"
-echo
-echo "Dependencies: python3, wl-clipboard (Wayland) or xclip/xsel (X11)."
-echo "Selection hotkey also needs Hyprland, or wtype / xdotool."
+echo "Example binds — see share/hyprland/bindings.example.lua"
+echo "  Ctrl+Shift+X → retypex sel (flip highlighted text)"

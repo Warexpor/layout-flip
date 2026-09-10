@@ -1,3 +1,4 @@
-# Classic Hyprland .conf — uses wtype/xdotool path inside --selection.
-# On Omarchy/Lua Hyprland, prefer share/hyprland/bindings.example.lua instead.
-bind = CTRL SHIFT, code:53, exec, layout-flip --selection
+# Prefer Omarchy Lua binds (share/hyprland/bindings.example.lua).
+# Select text, then Ctrl+Shift+X → retypex sel.
+# Use press bind (not bindr): release order of Ctrl/Shift/X is unreliable.
+bind = CTRL SHIFT, code:53, exec, retypex sel
