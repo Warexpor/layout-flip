@@ -7,45 +7,39 @@ z t,fk rf,fyf? ,kz  →  я ебал кабана, бля
 Ghbdtn              →  Привет
 ```
 
-## Hotkeys on Hyprland: use retypex
+## Hotkeys on Hyprland: patched retypex
 
-The old clipboard/`wtype` hotkey approach is too unreliable on Wayland. For in-app correction, install and run **[retypex](https://github.com/Lyssten/retypex)** instead:
+In-app correction uses a **patched [retypex](https://github.com/Lyssten/retypex)** daemon (evdev + uinput):
 
-- Daemon reads keycodes via **evdev**, injects via **uinput**
-- `retypex word` — erase last word, switch layout, retype same keys
-- `retypex sel` — convert highlighted text
+- `retypex sel` — flip selection (PRIMARY, or Ctrl+C → CLIPBOARD when PRIMARY is empty — Electron/Cursor)
+- Waits for Ctrl/Shift to lift before inject so the chord does not eat keys
+- Installed to `~/.local/bin/retypexd` and enabled as a **user systemd** unit (survives reboot; survives `pacman -Syu` overwriting `/usr/bin/retypexd`)
 
 ```bash
-yay -S retypex-git
-# uinput access (once): user in `input` group + udev rule from the package
-systemctl --user enable --now retypexd
+./install.sh
+# or only the daemon:
+./share/retypex/install-retypexd.sh
 ```
+
+Needs: `retypex-git` build deps (`gcc`, `make`), user in `input` group, package udev rule for `/dev/uinput`.
 
 Example bind: `share/hyprland/bindings.example.lua`
 
 | Chord | Action |
 |-------|--------|
-| Ctrl+Shift+X | `retypex sel` — flip highlighted text |
+| Ctrl+Shift+X | `retypex-logged sel` — flip selection |
 
 Flow: mistype → Ctrl+A (or select) → Ctrl+Shift+X.
 
-Also worth knowing: **[gswitch](https://github.com/arumata/gswitch)** (double-Shift trigger, more polished packaging; not Hyprland-specific).
-
-## Install (this CLI)
-
-```bash
-./install.sh
-```
-
-Needs `python3` plus `wl-clipboard` (or `xclip` / `xsel`).
-
-## Usage
+## CLI only
 
 ```bash
 layout-flip "z t,fk"          # print flipped text
 echo "Ghbdtn" | layout-flip
 layout-flip --clip            # flip clipboard in place
 ```
+
+Needs `python3` plus `wl-clipboard` (or `xclip` / `xsel`).
 
 ## License
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install layout-flip CLI into ~/.local/bin (override with PREFIX).
+# Install layout-flip CLI + patched retypexd (Hyprland hotkeys).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -23,8 +23,9 @@ case ":$PATH:" in
 esac
 
 echo
-echo "For Hyprland hotkeys, use retypex (not this script):"
-echo "  yay -S retypex-git && systemctl --user enable --now retypexd"
+echo "Installing patched retypexd (user systemd, ~/.local/bin)..."
+"$ROOT/share/retypex/install-retypexd.sh"
+
 echo
-echo "Example binds — see share/hyprland/bindings.example.lua"
-echo "  Ctrl+Shift+X → retypex sel (flip highlighted text)"
+echo "Hyprland bind example — share/hyprland/bindings.example.lua"
+echo "  Ctrl+Shift+X → retypex-logged sel (flip highlighted / Ctrl+A text)"
